@@ -6,6 +6,7 @@ const {
     generateRefreshToken,
     generateAccessToken,
 } = require("../utils/generateToken.js");
+var jwt = require("jsonwebtoken");
 
 const register = async (req, res, next) => {
     try {
@@ -100,4 +101,77 @@ const login = async (req, res, next) => {
     }
 };
 
-module.exports = { register, login };
+const getUser = async (req, res, next) => {
+    return res
+        .status(200)
+        .json(new Apiresp(200, req.user, "User found successfully"));
+};
+
+const logout = async (req, res, next) => {
+    req.user = null;
+    return res
+        .status(201)
+        .clearCookie("accessToken")
+        .clearCookie("refreshToken")
+        .json(new Apiresp(201, req.user, "User logged out successfully"));
+};
+
+const getAccessToken = async (req, res, next) => {
+    // Extracting access token
+    const { refreshToken } = req.cookie;
+
+    // If refresh token not found
+    if (!refreshToken) {
+        return res.status(401).json(new Apierror(401, "Unauthorized request"));
+    }
+
+    // Validating refresh token
+    try {
+        const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_KEY);
+
+        // Checking for user
+        const user = await User.findById(decoded?.id);
+
+        if (!user) {
+            return res
+                .status(404)
+                .json(new Apierror(404, "Invalid refresh token"));
+        }
+
+        // Checking incoming refresh token with refresh token saved in database
+        if (refreshToken !== user.refreshToken) {
+            return res
+                .status(403)
+                .json(new Apierror(403, "Refresh token expired"));
+        }
+
+        const options = {
+            secure: true,
+            httpOnly: true,
+        };
+
+        const accessToken = generateAccessToken(
+            user._id,
+            user.email,
+            user.name,
+            user.profileURL
+        );
+        const newRefreshToken = generateRefreshToken(user._id);
+
+        return res
+            .status(200)
+            .cookie("accessToken", accessToken, options)
+            .cookie("refreshToken", newRefreshToken, options)
+            .json(
+                new Apiresp(
+                    200,
+                    { accessToken, refreshToken: newRefreshToken },
+                    "New Accesstoken generated"
+                )
+            );
+    } catch (error) {
+        return res.status(500).json(new Apierror(500, "Something went wrong!"));
+    }
+};
+
+module.exports = { register, login, getUser, logout, getAccessToken };
