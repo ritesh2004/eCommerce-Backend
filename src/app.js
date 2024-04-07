@@ -2,6 +2,7 @@ var express = require("express");
 var userRouter = require("./routes/user.routes.js");
 var cookieParser = require("cookie-parser");
 const addressRouter = require("./routes/address.routes.js");
+const sellerRoute = require("./routes/seller.routes.js");
 
 // Initializing App
 const app = express();
@@ -18,5 +19,6 @@ app.use(cookieParser());
 //Router
 app.use("/api/v1", userRouter);
 app.use("/api/v1", addressRouter);
+app.use("/api/v1", sellerRoute);
 // Exporting App
 module.exports = app;
